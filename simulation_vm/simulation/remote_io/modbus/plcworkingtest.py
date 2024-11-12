@@ -46,30 +46,30 @@ store = ModbusSlaveContext(
         co=ModbusSequentialDataBlock(0,range(101,201)),
         hr=ModbusSequentialDataBlock(0,range(201,301)),
         ir=ModbusSequentialDataBlock(0,range(301,401)))
-single = True
-context = ModbusServerContext(slaves=store,single=single)
-identity = ModbusDeviceIdentification(
-        info_name={
-            "VendorName": "Pymodbus",
-            "ProductCode": "PM",
-            "VendorUrl": "https://github.com/pymodbus-dev/pymodbus/",
-            "ProductName": "Pymodbus Server",
-            "ModelName": "Pymodbus Server",
-            "MajorMinorRevision": pymodbus_version,
-        }
-    )
+context = ModbusServerContext(slaves=store,single=True)
+# identity = ModbusDeviceIdentification(
+#         info_name={
+#             "VendorName": "Pymodbus",
+#             "ProductCode": "PM",
+#             "VendorUrl": "https://github.com/pymodbus-dev/pymodbus/",
+#             "ProductName": "Pymodbus Server",
+#             "ModelName": "Pymodbus Server",
+#             "MajorMinorRevision": pymodbus_version,
+#         }
+#     )
 framer = 'socket'
 
-client = ModbusTcpClient(host=ADD,port=PORT)
+# client = ModbusTcpClient(host=ADD,port=PORT)
 
 
 def updating_writer(a):
     try:
-        client.connect()
+        # client.connect()
         while True:
             print('updating')
-            context  = a[0]
+            context  = a
             readfunction = 0x03 # read holding registers
+            readIR = 0x04 # read input registers
             writefunction = 0x10
             slave_id = 0x01 # slave address
             count = 50
@@ -79,20 +79,25 @@ def updating_writer(a):
                 pressure = 65535
             if level > 65535:
                 level = 65535
-            print(context)
+            print(f"-----------------{pressure}-------------------")
             # import pdb; pdb.set_trace()
-            cl_values = client.read_holding_registers(0,2)
-            cl_p_l = client.read_holding_registers(4,1)
-            print("----",cl_values.registers, cl_p_l.registers)
-            client.write_register(350,pressure,slave=1)
-            # context.setValues(4, 1, [pressure,level])
-            # values = context.getValues(readfunction, 0, 2)
+            # cl_values = client.read_holding_registers(0,2)
+            # cl_p_l = client.read_holding_registers(4,1)
+            # print("----",cl_values.registers, cl_p_l.registers)
+            # client.write_register(350,pressure,slave=1)
+            context[0].setValues(writefunction, 0, [pressure])
+            value = context[0].getValues(readfunction, 0, 1)
+            print(f"////////////////{value}///////////////////")
+            
+            # values = context[0].getValues(readIR, 0, 2)
             # log.debug("Values from datastore: " + str(values))
             sleep(1)
     except KeyboardInterrupt:
         print("Keyboard interrupt received, closing client.")
-    finally:
-        client.close()  # Ensure the client is closed on exit
+    except Exception as e:  # Catch any other exceptions
+        log.error("An error occurred: " + str(e))  # Log the error
+    # finally:
+        # client.close()  # Ensure the client is closed on exit
 
 async def start_server():
     loop = asyncio.get_event_loop()
@@ -101,7 +106,7 @@ async def start_server():
     
     await StartAsyncTcpServer(
         context=context,  # Data storage
-        identity=identity,  # server identify
+        # identity=identity,  # server identify
         address=address,  # listen address
         framer=framer,  # The framer strategy to use
     )

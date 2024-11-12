@@ -19,7 +19,7 @@ import json
 # --------------------------------------------------------------------------- #
 # import the modbus libraries we need
 # --------------------------------------------------------------------------- #
-from pymodbus.server.asynchronous import StartTcpServer
+from pymodbus.server import StartAsyncTcpServer
 from pymodbus.device import ModbusDeviceIdentification
 from pymodbus.datastore import ModbusSequentialDataBlock
 from pymodbus.datastore import ModbusServerContext, ModbusSlaveContext
@@ -35,42 +35,56 @@ from twisted.internet.task import LoopingCall
 # --------------------------------------------------------------------------- #
 # define your callback process
 # --------------------------------------------------------------------------- #
+import asyncio
+import logging
+import threading
+_logger = logging.getLogger(__file__)
+_logger.setLevel(logging.INFO)
 
-last_command = -1
-def updating_writer(a):
-    global last_command
-    print ('updating')
-    context  = a[0]
-    
-    slave_id = 0x01 # slave address
-    count = 50
-    s = a[1]
-    
+logging.basicConfig()
+log = logging.getLogger()
+log.setLevel(logging.DEBUG)
+ADD = "192.168.95.11"
+PORT = 5556
 
-    current_command = context[slave_id].getValues(16, 1, 1)[0] / 65535.0 *100.0
+def updating_writer(context,s):
+    try:
+        while True:
+            print ('updating')
+            
+            slave_id = 0x01 # slave address
+            
 
-    s.send(f'{{"request":"write","data":{{"inputs":{{"f2_valve_sp":{current_command}}}}}}}\n'.encode('utf-8'))
-    # import pdb; pdb.set_trace()
-    #s.send('{"request":"read"}')
-    data = json.loads(s.recv(1500))
-    valve_pos = int(data["state"]["f2_valve_pos"]/100.0*65535)
-    flow = int(data["outputs"]["f2_flow"]/500.0*65535)
-    print (data)
-    if valve_pos > 65535:
-        valve_pos = 65535
-    elif valve_pos < 0:
-        valve_pos = 0
-    if flow > 65535:
-        flow = 65535
-    elif flow < 0:
-        flow = 0
+            current_command = context[slave_id].getValues(16, 1, 1)[0] / 65535.0 *100.0
 
-    # import pdb; pdb.set_trace()
-    context[slave_id].setValues(4, 1, [valve_pos,flow])
+            s.send(f'{{"request":"write","data":{{"inputs":{{"f2_valve_sp":{current_command}}}}}}}\n'.encode('utf-8'))
+            # import pdb; pdb.set_trace()
+            #s.send('{"request":"read"}')
+            data = json.loads(s.recv(1500))
+            valve_pos = int(data["state"]["f2_valve_pos"]/100.0*65535)
+            flow = int(data["outputs"]["f2_flow"]/500.0*65535)
+            print (data)
+            if valve_pos > 65535:
+                valve_pos = 65535
+            elif valve_pos < 0:
+                valve_pos = 0
+            if flow > 65535:
+                flow = 65535
+            elif flow < 0:
+                flow = 0
+
+            # import pdb; pdb.set_trace()
+            context[slave_id].setValues(4, 0, [valve_pos,flow])
+            # print(f"---{valve_pos,flow}-----")
+            # read_values = context[slave_id].getValues(4, 0, 4)  # 3 corresponds to the ir data block, 2 is the starting address, 2 is the number of values to read
+            # print(f"Read back values: {read_values}")
+    except KeyboardInterrupt:
+        print("Keyboard interrupt received, closing client.")
+    except Exception as e:  # Catch any other exceptions
+        log.error("An error occurred: " + str(e))  # Log the error
 
 
-
-def run_update_server():
+async def run_update_server():
     # ----------------------------------------------------------------------- #
     # initialize your data store
     # ----------------------------------------------------------------------- #
@@ -103,11 +117,11 @@ def run_update_server():
     # ----------------------------------------------------------------------- #
     # run the server you want
     # ----------------------------------------------------------------------- #
-    time = 1  # 5 seconds delay
-    loop = LoopingCall(f=updating_writer, a=(context,sock))
-    loop.start(time, now=False)  # initially delay by time
-    StartTcpServer(context=context, identity=identity, address=("192.168.95.11", 502))
+    # time = 1  # 5 seconds delay
+    thread = threading.Thread(target=updating_writer, args=(context,sock))
+    thread.start()
+    await StartAsyncTcpServer(context=context, identity=identity, address=("192.168.95.11", 5556))
 
 
 if __name__ == "__main__":
-    run_update_server()
+    asyncio.run(run_update_server(),debug=True)
