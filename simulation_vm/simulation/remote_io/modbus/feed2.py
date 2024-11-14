@@ -25,7 +25,7 @@ from pymodbus.datastore import ModbusSequentialDataBlock
 from pymodbus.datastore import ModbusServerContext, ModbusSlaveContext
 # from pymodbus.transaction import ModbusRtuFramer, ModbusAsciiFramer
 import random
-
+from time import sleep
 # --------------------------------------------------------------------------- #
 # import the twisted libraries we need
 # --------------------------------------------------------------------------- #
@@ -45,7 +45,7 @@ logging.basicConfig()
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 ADD = "192.168.95.11"
-PORT = 5556
+S_PORT = 5556
 
 def updating_writer(context,s):
     try:
@@ -55,7 +55,10 @@ def updating_writer(context,s):
             slave_id = 0x01 # slave address
             
 
-            current_command = context[slave_id].getValues(16, 1, 1)[0] / 65535.0 *100.0
+            value_in_register = context[slave_id].getValues(3, 0, 20)
+            current_command = value_in_register[0]/ 65535.0*100.0
+            print(f"value in register is {value_in_register} and current command is {current_command}")
+            print("-----------------",current_command)
 
             s.send(f'{{"request":"write","data":{{"inputs":{{"f2_valve_sp":{current_command}}}}}}}\n'.encode('utf-8'))
             # import pdb; pdb.set_trace()
@@ -78,6 +81,7 @@ def updating_writer(context,s):
             # print(f"---{valve_pos,flow}-----")
             # read_values = context[slave_id].getValues(4, 0, 4)  # 3 corresponds to the ir data block, 2 is the starting address, 2 is the number of values to read
             # print(f"Read back values: {read_values}")
+            sleep(1)
     except KeyboardInterrupt:
         print("Keyboard interrupt received, closing client.")
     except Exception as e:  # Catch any other exceptions
@@ -120,7 +124,7 @@ async def run_update_server():
     # time = 1  # 5 seconds delay
     thread = threading.Thread(target=updating_writer, args=(context,sock))
     thread.start()
-    await StartAsyncTcpServer(context=context, identity=identity, address=("192.168.95.11", 5556))
+    await StartAsyncTcpServer(context=context, identity=identity, address=(ADD,S_PORT))
 
 
 if __name__ == "__main__":

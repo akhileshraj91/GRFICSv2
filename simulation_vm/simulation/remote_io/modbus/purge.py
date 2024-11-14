@@ -24,12 +24,10 @@ from pymodbus.device import ModbusDeviceIdentification
 from pymodbus.datastore import ModbusSequentialDataBlock
 from pymodbus.datastore import ModbusServerContext, ModbusSlaveContext
 # from pymodbus.transaction import ModbusRtuFramer, ModbusAsciiFramer
-import random
-
+import time
 # --------------------------------------------------------------------------- #
 # import the twisted libraries we need
 # --------------------------------------------------------------------------- #
-from twisted.internet.task import LoopingCall
 
 
 # --------------------------------------------------------------------------- #
@@ -50,17 +48,18 @@ S_PORT = 5557
 def updating_writer(context,s):
     try:
         while True:
-            global last_command
             print ('updating')
             
             slave_id = 0x01 # slave address
-            count = 50
 
-            current_command = context[slave_id].getValues(16, 1, 1)[0] / 65535.0 *100.0
-
+            actual_value = context[slave_id].getValues(3, 0, 1)[0] 
+            print(f"/////////////////////{actual_value}")
+            current_command = actual_value/ 65535.0 *100.0
+            print(f"--------------------{current_command}")
             # Corrected line to ensure proper string formatting and encoding
-            s.send(('{"request":"write","data":{"inputs":{"f1_valve_sp":'+repr(current_command)+'}}}\n').encode('utf-8'))
-
+            s.send(('{"request":"write","data":{"inputs":{"purge_valve_sp":'+repr(current_command)+'}}}\n').encode('utf-8'))
+            print(f"=======================================")
+            # s.send(f'{{"request":"write","data":{{"inputs":{{"purge_valve_sp":{current_command}}}}}\n'.encode('utf-8'))
             data = json.loads(s.recv(1500))
             valve_pos = int(data["state"]["purge_valve_pos"]/100.0*65535)
             flow = int(data["outputs"]["purge_flow"]/500.0*65535)
@@ -75,6 +74,7 @@ def updating_writer(context,s):
                 flow = 0
             # import pdb; pdb.set_trace()
             context[slave_id].setValues(4, 0, [valve_pos,flow])
+            time.sleep(1)
     except KeyboardInterrupt:
         print("Keyboard interrupt received, closing client.")
     except Exception as e:  # Catch any other exceptions
@@ -115,6 +115,7 @@ async def run_update_server():
     # ----------------------------------------------------------------------- #
     # run the server you want
     # ----------------------------------------------------------------------- #
+    loop = asyncio.get_event_loop()
     thread = threading.Thread(target=updating_writer, args=(context,sock))
     thread.start()
     await StartAsyncTcpServer(context=context, identity=identity, address=(ADD, S_PORT))

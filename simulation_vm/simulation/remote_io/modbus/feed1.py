@@ -26,6 +26,7 @@ from pymodbus.datastore import ModbusServerContext, ModbusSlaveContext
 import random
 import asyncio
 import threading
+from time import sleep
 # --------------------------------------------------------------------------- #
 # import the twisted libraries we need
 # --------------------------------------------------------------------------- #
@@ -38,7 +39,7 @@ logging.basicConfig()
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 ADD = "192.168.95.10"
-PORT = 5555
+S_PORT = 5555
 
 # --------------------------------------------------------------------------- #
 # define your callback process
@@ -54,8 +55,9 @@ def updating_writer(context,s):
             slave_id = 0x01 # slave address
             # s = a[1]
             
-            current_command = context[slave_id].getValues(16, 1, 1)[0] / 65535.0*100.0
-            print(f"current command is {current_command}")
+            value_in_register = context[slave_id].getValues(3, 0, 20)
+            current_command = value_in_register[0]/ 65535.0*100.0
+            print(f"value in register is {value_in_register} and current command is {current_command}")
             s.send(json.dumps({"request": "write", "data": {"inputs": {"f1_valve_sp": current_command}}}).encode('utf-8'))
 
             # import pdb; pdb.set_trace()
@@ -79,6 +81,7 @@ def updating_writer(context,s):
             # read_values = context[slave_id].getValues(4, 0, 4)  # 3 corresponds to the ir data block, 2 is the starting address, 2 is the number of values to read
             # print(f"Read back values: {read_values}")
             # print("----------------------------")
+            sleep(1)
     except KeyboardInterrupt:
         print("Keyboard interrupt received, closing client.")
     except Exception as e:  # Catch any other exceptions
@@ -124,7 +127,7 @@ async def run_update_server():
     loop = asyncio.get_event_loop()
     thread = threading.Thread(target=updating_writer, args=(context,sock))
     thread.start()
-    await StartAsyncTcpServer(context=context, identity=identity, address=("192.168.95.10", 5555))
+    await StartAsyncTcpServer(context=context, identity=identity, address=(ADD,S_PORT))
 
 
 if __name__ == "__main__":

@@ -19,17 +19,16 @@ import json
 # --------------------------------------------------------------------------- #
 # import the modbus libraries we need
 # --------------------------------------------------------------------------- #
-from pymodbus.server.asynchronous import StartTcpServer
+from pymodbus.server import StartTcpServer
 from pymodbus.device import ModbusDeviceIdentification
 from pymodbus.datastore import ModbusSequentialDataBlock
 from pymodbus.datastore import ModbusServerContext, ModbusSlaveContext
+import time
 #from pymodbus.transaction import ModbusRtuFramer, ModbusAsciiFramer
-import random
 
 # --------------------------------------------------------------------------- #
 # import the twisted libraries we need
 # --------------------------------------------------------------------------- #
-from twisted.internet.task import LoopingCall
 
 # --------------------------------------------------------------------------- #
 # configure the service logging
@@ -42,33 +41,48 @@ log.setLevel(logging.DEBUG)
 # --------------------------------------------------------------------------- #
 # define your callback process
 # --------------------------------------------------------------------------- #
+import asyncio
+import logging
+import threading
+_logger = logging.getLogger(__file__)
+_logger.setLevel(logging.INFO)
 
+logging.basicConfig()
+log = logging.getLogger()
+log.setLevel(logging.DEBUG)
+ADD = "192.168.95.14"
+S_PORT = 5559
+# last_command = -1
+def updating_writer(context,s):
+    try:
+        while True:
+            print('updating')
+            readfunction = 0x03 # read holding registers
+            readinput = 0x04 # read input registers
+            writefunction = 0x10
+            slave_id = 0x01 # slave address
+            # import pdb; pdb.set_trace()
+            # print("------------")
+            # Send the request as bytes
+            s.send('{"request":"read"}'.encode('utf-8'))
+            data = json.loads(s.recv(1500))
+            pressure = int(data["outputs"]["pressure"]/3200.0*65535)
+            level = int(data["outputs"]["liquid_level"]/100.0*65535)
+            if pressure > 65535:
+                pressure = 65535
+            if level > 65535:
+                level = 65535
+            print(data)
 
-def updating_writer(a):
-    print('updating')
-    context  = a[0]
-    readfunction = 0x03 # read holding registers
-    writefunction = 0x10
-    slave_id = 0x01 # slave address
-    count = 50
-    s = a[1]
-    # import pdb; pdb.set_trace()
-    # print("------------")
-    # Send the request as bytes
-    s.send('{"request":"read"}'.encode('utf-8'))
-    data = json.loads(s.recv(1500))
-    pressure = int(data["outputs"]["pressure"]/3200.0*65535)
-    level = int(data["outputs"]["liquid_level"]/100.0*65535)
-    if pressure > 65535:
-        pressure = 65535
-    if level > 65535:
-        level = 65535
-    print(data)
-
-    # import pdb; pdb.set_trace()
-    context[slave_id].setValues(4, 1, [pressure,level])
-    values = context[slave_id].getValues(readfunction, 0, 2)
-    log.debug("Values from datastore: " + str(values))
+            # import pdb; pdb.set_trace()
+            context[slave_id].setValues(4, 0, [pressure,level])
+            values = context[slave_id].getValues(readinput, 0, 2)
+            log.debug("Values from datastore: " + str(values))
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("Keyboard interrupt received, closing client.")
+    except Exception as e:  # Catch any other exceptions
+        log.error("An error occurred: " + str(e))  # Log the error
 
 
 def run_update_server():
@@ -104,11 +118,10 @@ def run_update_server():
     # ----------------------------------------------------------------------- #
     # run the server you want
     # ----------------------------------------------------------------------- #
-    time = 1  # 5 seconds delay
-    loop = LoopingCall(f=updating_writer, a=(context,sock))
-    loop.start(time, now=False)  # initially delay by time
-    StartTcpServer(context=context, identity=identity, address=("192.168.95.14", 502))
+    thread = threading.Thread(target=updating_writer, args=(context,sock))
+    thread.start()
+    StartTcpServer(context=context, identity=identity, address=(ADD,S_PORT))
 
 
 if __name__ == "__main__":
-    run_update_server()
+    asyncio.run(run_update_server(),debug=True)
