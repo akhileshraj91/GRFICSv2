@@ -30,15 +30,24 @@ from time import sleep
 # --------------------------------------------------------------------------- #
 # import the twisted libraries we need
 # --------------------------------------------------------------------------- #
-from twisted.internet.task import LoopingCall
 import logging
 _logger = logging.getLogger(__file__)
 _logger.setLevel(logging.INFO)
 
+def get_ip_address():
+    try:
+        # Create a socket connection to an external server
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Google's public DNS server
+        ip_address = s.getsockname()[0]  # Get the local IP address
+    finally:
+        s.close()  # Close the socket
+    return ip_address
+
 logging.basicConfig()
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
-ADD = "192.168.95.10"
+ADD = get_ip_address()
 S_PORT = 5555
 
 # --------------------------------------------------------------------------- #

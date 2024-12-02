@@ -29,7 +29,6 @@ from time import sleep
 # --------------------------------------------------------------------------- #
 # import the twisted libraries we need
 # --------------------------------------------------------------------------- #
-from twisted.internet.task import LoopingCall
 
 
 # --------------------------------------------------------------------------- #
@@ -38,13 +37,26 @@ from twisted.internet.task import LoopingCall
 import asyncio
 import logging
 import threading
+
+def get_ip_address():
+    try:
+        # Create a socket connection to an external server
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Google's public DNS server
+        ip_address = s.getsockname()[0]  # Get the local IP address
+    finally:
+        s.close()  # Close the socket
+    return ip_address
+
+# print("Your IP address is:", get_ip_address())
+
 _logger = logging.getLogger(__file__)
 _logger.setLevel(logging.INFO)
 
 logging.basicConfig()
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
-ADD = "192.168.95.11"
+ADD = get_ip_address()
 S_PORT = 5556
 
 def updating_writer(context,s):

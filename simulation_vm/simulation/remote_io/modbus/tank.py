@@ -34,6 +34,17 @@ import time
 # configure the service logging
 # --------------------------------------------------------------------------- #
 import logging
+
+def get_ip_address():
+    try:
+        # Create a socket connection to an external server
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # Google's public DNS server
+        ip_address = s.getsockname()[0]  # Get the local IP address
+    finally:
+        s.close()  # Close the socket
+    return ip_address
+
 logging.basicConfig()
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
@@ -50,7 +61,7 @@ _logger.setLevel(logging.INFO)
 logging.basicConfig()
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
-ADD = "192.168.95.14"
+ADD = get_ip_address()
 S_PORT = 5559
 # last_command = -1
 def updating_writer(context,s):
