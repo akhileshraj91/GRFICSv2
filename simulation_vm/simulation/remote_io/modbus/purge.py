@@ -40,7 +40,7 @@ def get_ip_address():
     try:
         # Create a socket connection to an external server
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))  # Google's public DNS server
+        s.connect(("10.10.30.20", 80))  # Google's public DNS server
         ip_address = s.getsockname()[0]  # Get the local IP address
     finally:
         s.close()  # Close the socket
@@ -53,7 +53,7 @@ logging.basicConfig()
 log = logging.getLogger()
 log.setLevel(logging.DEBUG)
 ADD = get_ip_address()
-S_PORT = 5557
+S_PORT = 5997
 # last_command = -1
 def updating_writer(context,s):
     try:
